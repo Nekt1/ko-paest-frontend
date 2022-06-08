@@ -2,13 +2,13 @@
   <div class="home container mt-4">
     <!-- <img alt="Vue logo" src="../assets/logo.png"> -->
     <!-- <HelloWorld msg="Welcome to Your Vue.js App"/> -->
-    <form class="border border-danger rounded-2 px-3 pb-5 pt-3">
+    <div class="border border-danger rounded-2 px-3 pb-5 pt-3">
         <!-- <h1 class="display-3 fst-italic text-danger text-center">KO PAĒST?</h1> -->
         <img class="d-block img-fluid mx-auto" src="../assets/ko-paest-logo.jpg">
         <div class="row">
             <div class="mb-3 col">
                 <label for="searchMode" class="form-label fw-bold">Choose your search mode:</label>
-                <select v-model="searchMode" class="form-select" aria-label="Select the search mode" title="Choose the mode to search the recipes" id="searchMode" @change="this.apiInput = ''">
+                <select v-model="searchMode" class="form-select" aria-label="Select the search mode" title="Choose the mode to search the recipes" id="searchMode" @change="clearSearch()">
                     <option value="ingredients">Search by ingredients</option>
                     <option value="nutrients">Search by calories</option>
                     <option value="name">Search by recipe name</option>
@@ -51,14 +51,14 @@
         </div>
 
         <div class="d-flex justify-content-between">
-            <button type="submit" class="btn btn-danger" @click="sendInput"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
-            <button type="submit" class="btn btn-danger ms-2" @click="getRandomRecipes"><i class="fa-solid fa-dice"></i> Surprise me!</button>
+            <button type="button" class="btn btn-danger" @click="sendInput"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+            <button type="button" class="btn btn-danger ms-2" @click="getRandomRecipes"><i class="fa-solid fa-dice"></i> Surprise me!</button>
         </div>
-    </form>
+    </div>
 
     <div v-if="isFetched && this.recipes.length > 1" class="mt-5 px-4">
         <div class="d-flex row">
-          <div v-for="recipe of recipes" :key="recipe.id" class="card text-center px-0 col-md-4 mb-2">
+          <div v-for="recipe of recipes" :key="recipe.id" class="card text-center px-0 col-md-4 mb-2 pb-2">
             <div class="row g-0">
             <div class="d-flex align-items-center col-6 col-md-12">
                 <img v-bind:src="recipe.image" alt="recipe-picture" class="card-img-top">
@@ -66,7 +66,7 @@
             <div class="col-6 col-md-12 card-body p-0">
               <p class="card-title px-2 my-2">{{recipe.title}}</p>
               <p class="card-text my-2" v-if="searchMode === 'nutrients'">Calories: {{recipe.calories}}</p>
-              <button class="btn btn-outline-danger mt-2 mb-3" @click="getInstructions(recipe.id, recipe.title)" data-bs-toggle="modal" data-bs-target="#exampleModal">Instructions</button>
+              <button class="btn btn-outline-danger mt-2 mb-3" @click="getInstructions(recipe.id, recipe.title, recipe.image)" data-bs-toggle="modal" data-bs-target="#recipeModal">Instructions</button>
             </div>
             </div>
           </div>
@@ -79,7 +79,7 @@
 
   </div>
 
-  <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal fade" id="recipeModal" tabindex="-1" aria-labelledby="recipeModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div id="pdf-content">
@@ -97,12 +97,11 @@
         <div v-else class="modal-body">Sorry, we couldn't display your recipe instructions. Maybe you could try another one?</div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary">Save to profile</button>
+        <button @click="saveToProfile()" type="button" class="btn btn-primary" :class="{disabled: Object.keys(this.$store.state.user).length === 0}">Save to profile</button>
         <button type="button" class="btn btn-danger" @click="generatePDF()">Download as PDF</button>
       </div>
     </div>
   </div>
-
   </div>
 
 </template>
@@ -137,6 +136,8 @@ export default {
       recipes: [],
       selectedRecipe: '',
       selectedRecipeTitle: '',
+      selectedRecipeID: '',
+      selectedRecipeIMG: '',
       searchMode: 'ingredients',
       nutrientsMin: 0,
       nutrientsMax: 0
@@ -167,10 +168,12 @@ export default {
         })
       }
     },
-    getInstructions (id, title) {
+    getInstructions (id, title, image) {
       axios.get(`https://api.spoonacular.com/recipes/${id}/analyzedInstructions?apiKey=${this.apiKey}`).then(response => {
         this.selectedRecipe = response.data
         this.selectedRecipeTitle = title
+        this.selectedRecipeID = id
+        this.selectedRecipeIMG = image
         this.selectedRecipe = this.selectedRecipe[0]
       })
     },
@@ -212,6 +215,27 @@ export default {
         filename: `${this.selectedRecipeTitle}-recipe`
       }
       html2pdf().set(opt).from(element).save()
+    },
+    async saveToProfile () {
+      // eslint-disable-next-line no-unused-vars
+      const save = await axios.post('https://fathomless-meadow-35990.herokuapp.com/saveRecipe', {
+        remote_id: this.selectedRecipeID,
+        title: this.selectedRecipeTitle,
+        image_url: this.selectedRecipeIMG,
+        user_id: this.$store.state.user.id
+      })
+        .then(function (response) {
+          alert('Recipe saved successfully')
+          return response.data
+        })
+        .catch((error) => {
+          alert(error.response.data.message)
+          return error
+        })
+    },
+    clearSearch () {
+      this.apiInput = ''
+      this.recipes = ''
     }
   }
 }
